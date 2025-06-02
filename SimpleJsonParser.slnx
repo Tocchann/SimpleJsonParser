@@ -1,0 +1,11 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/ソリューション項目/">
+    <File Path="LICENSE.txt" />
+    <File Path="Readme.md" />
+  </Folder>
+  <Project Path="SimpleJsonParser/SimpleJsonParser.vcxproj" Id="cfd069b7-a621-4fa3-acdf-dfdfb67a0133" />
+</Solution>
