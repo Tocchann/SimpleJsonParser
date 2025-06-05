@@ -8,9 +8,10 @@
 #include "ParseJSON.h"
 #include <array>
 #include <stack>
-#include <format>
 #include <stdexcept>
-
+#if _HAS_CXX20
+#include <format>
+#endif
 using namespace std::string_view_literals;
 using namespace std::string_literals;
 
@@ -54,6 +55,20 @@ static const std::initializer_list<EscapeCharDetail> EscapeChars
 //---------------
 //	class
 //---------------
+#if !_HAS_CXX20
+template <class... _Types>
+std::string SPRINTF( _In_z_ _Printf_format_string_ const char* _fmt, ... )
+{
+	CStringA text;
+	va_list argList;
+	va_start( argList, _fmt );
+	text.FormatV( _fmt, argList );
+	va_end( argList );
+	std::string result{ text };
+	return result;
+}
+#endif
+
 class JsonParser
 {
 public:
@@ -83,7 +98,11 @@ private:
 	{
 		if( m_offset >= m_jsonText.length() )
 		{
+#if _HAS_CXX20
 			throw std::out_of_range( std::format( "m_offset {} is out of range for data length {}", m_offset, m_jsonText.length() ) );
+#else
+			throw std::out_of_range( SPRINTF( "m_offset %u is out of range for data length %u", m_offset, m_jsonText.length() ) );
+#endif
 		}
 		return m_jsonText[m_offset];
 	}
@@ -182,7 +201,11 @@ std::any __stdcall ParseJSON( const std::string_view& jsonText, const concurrenc
 		case Morrin::JSON::NotificationType::EndParse:		break;	//	パース開始と終了は何もしないので無視(defaultに行かないようにブロック)
 		default:
 			// 想定外は例外を飛ばす
+#if _HAS_CXX20
 			throw new std::runtime_error( std::format( "Unknown NotificationType: {}", static_cast<int>(type) ) );
+#else
+			throw new std::runtime_error( SPRINTF( "Unknown NotificationType: %d", static_cast<int>(type) ) );
+#endif
 		}
 		return true; // trueを返すと、さらに子要素のパースを続ける	)
 	} );
@@ -475,7 +498,11 @@ bool JsonParser::ParseElement()
 			break;
 		}
 		// ここにきたらパースエラー
+#if _HAS_CXX20
 		throw new std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected character '{}'", m_offset, GetChar() ) );
+#else
+		throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected character '%c'", m_offset, GetChar() ) );
+#endif
 	}
 	// 末尾に来てる…ここにくるんだっけ？
 	return false;
@@ -501,7 +528,11 @@ bool JsonParser::ParseValues( NotificationType start, NotificationType end, bool
 		// 終端記号が来る前にデータがなくなった(あり得ない)
 		if( m_offset >= m_jsonText.length() )
 		{
+#if _HAS_CXX20
 			throw new std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected end of data", m_offset ) );
+#else
+			throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected end of data", m_offset ) );
+#endif
 		}
 		// 終端文字が来たのでブロック終了(必ずここに来る…はず)
 		if( GetChar() == static_cast<char>(end) )
@@ -511,7 +542,11 @@ bool JsonParser::ParseValues( NotificationType start, NotificationType end, bool
 		_ASSERTE( GetChar() == ',' );	//	区切り文字が来るはず
 		if( GetChar() != ',' )
 		{
+#if _HAS_CXX20
 			throw new std::invalid_argument( std::format( "Parse error at m_offset {}: expected ',' but found '{}'", m_offset, GetChar() ) );
+#else
+			throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected ',' but found '%c'", m_offset, GetChar() ) );
+#endif
 		}
 	}
 	// ここには来ない(来るとしたら、エラーチェックをすり抜けて来る場合だけ)
@@ -536,7 +571,11 @@ bool JsonParser::ParseKeyValue()
 	_ASSERTE( m_offset < m_jsonText.length() && GetChar() == ':' );	//	キーと値の区切りはコロンであることを前提にしている
 	if( m_offset >= m_jsonText.length() || GetChar() != ':' )
 	{
+#if _HAS_CXX20
 		throw new std::invalid_argument( std::format( "Parse error at m_offset {}: expected ':' but found '{}'", m_offset, GetChar() ) );
+#else
+		throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected ':' but found '%c'", m_offset, GetChar() ) );
+#endif
 	}
 	++m_offset;
 	if( !ParseElement() )
@@ -594,7 +633,11 @@ bool JsonParser::ParseNumber()
 	{
 		if( m_offset >= m_jsonText.length() || !isdigit( GetChar() ) )	// 数字がないといけない
 		{
+#if _HAS_CXX20
 			throw new std::invalid_argument( std::format( "Parse error at m_offset {}: expected digit after 'e' or 'E' but found '{}'", m_offset, GetChar() ) );
+#else
+			throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected digit after 'e' or 'E' but found '%c'", m_offset, GetChar() ) );
+#endif
 		}
 		while( isdigit( GetChar() ) )	// 数字が続く限り進める
 		{
@@ -635,7 +678,11 @@ std::string_view JsonParser::ParseStringValue()
 						if( !isxdigit( GetChar() ) )
 						{
 							// そもそも例外
+#if _HAS_CXX20
 							throw new std::invalid_argument( std::format( "Parse error at m_offset {}: expected hex digit after '\\u'", m_offset ) );
+#else
+							throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected hex digit after '\\u'", m_offset ) );
+#endif
 						}
 					}
 				}
@@ -647,7 +694,11 @@ std::string_view JsonParser::ParseStringValue()
 			else
 			{
 				// エスケープ文字が定義されていない場合は例外
+#if _HAS_CXX20
 				throw new std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected escape character '{}'", m_offset, currChar ) );
+#else
+				throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected escape character '%c'", m_offset, currChar ) );
+#endif
 			}
 		}
 		else
