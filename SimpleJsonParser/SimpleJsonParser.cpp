@@ -88,7 +88,11 @@ int wmain( int argc, wchar_t* argv[] )
 			}
 			if( firstKeyName.empty() && type == Morrin::JSON::NotificationType::Key )
 			{
+#ifdef FORCE_REFERENCE_VALUE
+				firstKeyName = value;
+#else
 				firstKeyName = Morrin::JSON::UnEscapeToString( value );
+#endif
 			}
 			std::wcout << msg;
 			OutputDebugString( msg.c_str() );
@@ -109,8 +113,25 @@ int wmain( int argc, wchar_t* argv[] )
 		case '[':	_ASSERTE( obj.type() == typeid(Morrin::JSON::JsonArray) );	break;
 		}
 		// 何が来てるかわからないけど最初のオブジェクトのキーを取得してみる
+		bool getVersion = false;
+		if ( firstKeyName == "LaunchPackage" )
+		{
+			getVersion = true;
+			firstKeyName = "LaunchList/3/MsiPackage/Version";
+		}
 		auto firstObj = Morrin::JSON::GetValue( obj, firstKeyName );
-		_ASSERTE( firstObj.has_value() && firstObj.type() == typeid(Morrin::JSON::JsonObject) );
+		if ( getVersion )
+		{
+			_ASSERTE( firstObj.has_value() && firstObj.type() == typeid(Morrin::JSON::JsonString) );
+			auto version = Morrin::JSON::UnEscapeToWstring( std::any_cast<Morrin::JSON::JsonString>( firstObj ) );
+			_ASSERTE( version.empty() == false );
+			std::wcout << std::format( L"Version: `{}`\n", version );
+
+		}
+		else
+		{
+			_ASSERTE( firstObj.has_value() && firstObj.type() == typeid(Morrin::JSON::JsonObject) );
+		}
 	}
 	return 0;
 }
