@@ -186,16 +186,25 @@ std::any __stdcall ParseJSON( const std::string_view& jsonText, const concurrenc
 		}
 		switch( type )
 		{
+#ifdef FORCE_REFERENCE_VALUE
+		case Morrin::JSON::NotificationType::Key:			keyName = value;							break;
+#else
 		case Morrin::JSON::NotificationType::Key:			keyName = UnEscapeToString( value );		break;
+#endif
 		case Morrin::JSON::NotificationType::StartObject:	PushValueT( stack, keyName, JsonObject() );	break;
 		case Morrin::JSON::NotificationType::StartArray:	PushValueT( stack, keyName, JsonArray() );	break;
 		case Morrin::JSON::NotificationType::EndObject:
 		case Morrin::JSON::NotificationType::EndArray:		stack.pop();	break;
 		// 値型はそのまま追加するだけでよいはず…
+#ifdef FORCE_REFERENCE_VALUE
+		//	文字列はそのまま追加する(参照を持たせる)
+		case Morrin::JSON::NotificationType::String:		AddValue( stack.top(), keyName, value );	break;
+#else
 		case Morrin::JSON::NotificationType::String:		AddValue( stack.top(), keyName, std::make_any<JsonString>( UnEscapeToWstring(value) ) );	break;
+#endif
 		case Morrin::JSON::NotificationType::Number:		AddValue( stack.top(), keyName, std::make_any<int>( ConvertToInt( value ) ) );				break;
-		case Morrin::JSON::NotificationType::BooleanTrue:	AddValue( stack.top(), keyName, std::make_any<bool>( true ) );								break;
-		case Morrin::JSON::NotificationType::BooleanFalse:	AddValue( stack.top(), keyName, std::make_any<bool>( false ) );							break;
+		case Morrin::JSON::NotificationType::BooleanTrue:	AddValue( stack.top(), keyName, std::make_any<bool>( true ) );							break;
+		case Morrin::JSON::NotificationType::BooleanFalse:	AddValue( stack.top(), keyName, std::make_any<bool>( false ) );						break;
 		case Morrin::JSON::NotificationType::Null:			AddValue( stack.top(), keyName, std::any() );												break;
 		case Morrin::JSON::NotificationType::StartParse:
 		case Morrin::JSON::NotificationType::EndParse:		break;	//	パース開始と終了は何もしないので無視(defaultに行かないようにブロック)
@@ -237,7 +246,7 @@ std::any APIENTRY GetValue( std::any obj, const JsonRefKeyType& searchKey )
 			if( isdigit( key[0] ) )
 			{
 				// string_view 版 atoi に相当するものがないので自力で回す(ここは、0以上の正数しか来ないので、単純ループでよい)
-				JsonRefKeyType::size_type pos = 1;
+				JsonRefKeyType::size_type pos = 0;
 				JsonArray::size_type index = 0;
 				while( pos < key.length() && isdigit( key[pos] ) )
 				{

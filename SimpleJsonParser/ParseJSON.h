@@ -1,51 +1,74 @@
-// 簡易JSONパーサー
+//=============================================================================
+//
+//			タイトル：	速度優先型デコード専用JSONパーサー C++20版
+//
+//			　担当者：	高萩 俊行
+//
+//=============================================================================
+// 説明・諸注意
+//	JSONデータの書式の規定は http://www.json.org/json-ja.html を参照(2018/11/05時点の内容に準拠)
 
 //---------------
 //	Include Files
 //---------------
-#include <string_view>
-#include <string>
-#include <map>
-#include <vector>
 #include <any>
 #include <functional>
+#include <map>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include <ppl.h>
 
 namespace Morrin::JSON
 {
-
 //---------------
 //	defines
 //---------------
-enum class NotificationType
+/// <summary>
+/// JSONの通知タイプを定義する列挙型
+/// </summary>
+/// remarks
+/// キャストして使えるようにするため、リテラルとマップする形に変更
+enum class NotificationType : char
 {
 	StartParse,
 	EndParse,
+
+	Key,
+	String,
+	Number,
+	BooleanTrue,
+	BooleanFalse,
+	Null,
 
 	StartObject = '{',
 	EndObject = '}',
 	
 	StartArray = '[',
 	EndArray = ']',
-
-	Key = ':',
-	String = '"',
-	Number = '0',
-	BooleanTrue = 't',
-	BooleanFalse = 'f',
-	Null = 'n',
 };
+// そもそもが値として不整合が出ていないこと
+static_assert(NotificationType::StartObject > NotificationType::Null );
 
-
-
+//	パース結果のコールバック受け取りメソッド( bool func( Morrin::JSON::NotificationType type, const std::string_view& value ) )
 using ParseCallBack = std::function<bool( NotificationType type, const std::string_view& value )> const;
 
-using JsonRefKeyType = std::string_view;	// キーは UTF8 のまま
-using JsonKeyType = std::string;	// キーは UTF8 のまま
+// std::any に格納されるデータ定義
+
+// 検索などの参照用データ
+using JsonRefKeyType = std::string_view;
+
+
+#ifdef FORCE_REFERENCE_VALUE
+using JsonKeyType = JsonRefKeyType;
+using JsonString = JsonRefKeyType;	// そのまま参照するので、変換処理も施さない
+#else
+using JsonKeyType = std::string;
+using JsonString = std::wstring;	// 文字列データは、正規化しておく
+#endif
 using JsonObject = std::map<JsonKeyType, std::any>;
 using JsonArray = std::vector<std::any>;	// 配列は std::any で値を保持する
-using JsonString = std::wstring;	// 文字列データは、正規化しておく
 //---------------
 //	prottype
 //---------------
