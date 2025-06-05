@@ -123,7 +123,11 @@ int wmain( int argc, wchar_t* argv[] )
 		if ( getVersion )
 		{
 			_ASSERTE( firstObj.has_value() && firstObj.type() == typeid(Morrin::JSON::JsonString) );
+#ifdef FORCE_REFERENCE_VALUE
 			auto version = Morrin::JSON::UnEscapeToWstring( std::any_cast<Morrin::JSON::JsonString>( firstObj ) );
+#else
+			auto version = std::any_cast<Morrin::JSON::JsonString>(firstObj);
+#endif
 			_ASSERTE( version.empty() == false );
 			std::wcout << std::format( L"Version: `{}`\n", version );
 
