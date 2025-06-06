@@ -31,7 +31,7 @@ static std::string LoadFile( const wchar_t* filePath )
 		throw std::runtime_error( std::format( "Failed to get file size: {}", filePathA ) );
 	}
 	std::string result;
-	result.resize(fileSize);
+	result.resize( static_cast<size_t>(fileSize) );
 	if( FAILED( file.Read( result.data(), static_cast<DWORD>(result.length()) ) ) )
 	{
 		std::wcerr << std::format( L"Failed to read file: {}\n", filePath );
@@ -118,15 +118,17 @@ int wmain( int argc, wchar_t* argv[] )
 		{
 			getVersion = true;
 			firstKeyName = "LaunchList/3/MsiPackage/Version";
+			auto launchList = Morrin::JSON::GetValue( obj, "LaunchList" );
+			_ASSERTE( launchList.has_value() && launchList.type() == typeid(Morrin::JSON::JsonArray) );
 		}
-		auto firstObj = Morrin::JSON::GetValue( obj, firstKeyName );
+		auto searchObj = Morrin::JSON::GetValue( obj, firstKeyName );
 		if ( getVersion )
 		{
-			_ASSERTE( firstObj.has_value() && firstObj.type() == typeid(Morrin::JSON::JsonString) );
+			_ASSERTE( searchObj.has_value() && searchObj.type() == typeid(Morrin::JSON::JsonString) );
 #ifdef FORCE_REFERENCE_VALUE
 			auto version = Morrin::JSON::UnEscapeToWstring( std::any_cast<Morrin::JSON::JsonString>( firstObj ) );
 #else
-			auto version = std::any_cast<Morrin::JSON::JsonString>(firstObj);
+			auto version = std::any_cast<Morrin::JSON::JsonString>(searchObj);
 #endif
 			_ASSERTE( version.empty() == false );
 			std::wcout << std::format( L"Version: `{}`\n", version );
@@ -134,7 +136,7 @@ int wmain( int argc, wchar_t* argv[] )
 		}
 		else
 		{
-			_ASSERTE( firstObj.has_value() && firstObj.type() == typeid(Morrin::JSON::JsonObject) );
+			_ASSERTE( searchObj.has_value() && searchObj.type() == typeid(Morrin::JSON::JsonObject) );
 		}
 	}
 	return 0;
