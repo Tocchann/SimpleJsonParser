@@ -1,16 +1,25 @@
-// 簡易JSONパーサー
-
+//=============================================================================
+//
+//			タイトル：	速度優先型デコード専用JSONパーサー C++20版
+//
+//			　担当者：	高萩 俊行
+//
+//=============================================================================
+// 説明・諸注意
+// C++20 にしている場合はstd::formatを利用する。
 //---------------
 //	Include Files
 //---------------
 #include "stdafx.h"
 
 #include "ParseJSON.h"
-#include <array>
+
 #include <stack>
 #include <stdexcept>
 #if _HAS_CXX20
 #include <format>
+#else
+#include <stdarg.h>
 #endif
 using namespace std::string_view_literals;
 using namespace std::string_literals;
@@ -56,15 +65,15 @@ static const std::initializer_list<EscapeCharDetail> EscapeChars
 //	class
 //---------------
 #if !_HAS_CXX20
-template <class... _Types>
-std::string SPRINTF( _In_z_ _Printf_format_string_ const char* _fmt, ... )
+inline std::string SPRINTF( _In_z_ _Printf_format_string_ const char* _fmt, ... )
 {
-	CStringA text;
+	std::string result;
+	result.resize( 1024 );
 	va_list argList;
 	va_start( argList, _fmt );
-	text.FormatV( _fmt, argList );
+	auto length = vsnprintf( result.data(), result.size(), _fmt, argList );
 	va_end( argList );
-	std::string result{ text };
+	result.resize( length );
 	return result;
 }
 #endif
@@ -223,7 +232,7 @@ std::any __stdcall ParseJSON( const std::string_view& jsonText, const concurrenc
 	//auto top = std::any_cast<JsonObject>(topObj);
 	return top[rootName];
 }
-std::any APIENTRY GetValue( std::any obj, const JsonRefKeyType& searchKey )
+std::any __stdcall GetValue( std::any obj, const JsonRefKeyType& searchKey )
 {
 	_ASSERTE( obj.has_value() );
 	// 検索要素が何もない場合は、objをそのまま返す
