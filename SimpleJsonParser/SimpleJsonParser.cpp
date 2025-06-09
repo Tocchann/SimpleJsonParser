@@ -13,6 +13,11 @@
 #include <format>
 #include <sstream>
 
+inline static void Trace( const std::wstring& msg, std::wostream& out = std::wcout )
+{
+	OutputDebugString( msg.c_str() );
+	out << msg;
+}
 
 static std::string LoadFile( const wchar_t* filePath )
 {
@@ -21,20 +26,20 @@ static std::string LoadFile( const wchar_t* filePath )
 	std::string filePathA = Morrin::JSON::ToString( filePath, CP_ACP );
 	if( FAILED( hr ) )
 	{
-		std::wcerr << std::format( L"Failed to open file: {} (HRESULT: 0x{:08X})\n", filePath, hr );
+		Trace( std::format( L"Failed to open file: {} (HRESULT: 0x{:08X})\n", filePath, hr ), std::wcerr );
 		throw std::runtime_error( std::format( "Failed to open file: {} (HRESULT: 0x{:08X})", filePathA, hr ) );
 	}
 	ULONGLONG fileSize = 0;
 	if( FAILED( file.GetSize( fileSize ) ) )
 	{
-		std::wcerr << std::format( L"Failed to get file size: {}\n", filePath );
+		Trace( std::format( L"Failed to get file size: {}\n", filePath ), std::wcerr );
 		throw std::runtime_error( std::format( "Failed to get file size: {}", filePathA ) );
 	}
 	std::string result;
 	result.resize( static_cast<size_t>(fileSize) );
 	if( FAILED( file.Read( result.data(), static_cast<DWORD>(result.length()) ) ) )
 	{
-		std::wcerr << std::format( L"Failed to read file: {}\n", filePath );
+		Trace( std::format( L"Failed to read file: {}\n", filePath ), std::wcerr );
 		throw std::runtime_error( std::format( "Failed to read file: {}", filePathA ) );
 	}
 	return result;
@@ -48,16 +53,16 @@ int wmain( int argc, wchar_t* argv[] )
 	// パラメータにセットされているファイル(JSON)をパースする
 	for( int index = 0; index < argc; index++ )
 	{
-		std::wcout << L"argv[" << index << L"]: " << argv[index] << L"\n";
+		Trace( std::format( L"argv[{}]: {}\n", index, argv[index] ) );
 	}
 	// コールバックで表示する
 	for( int index = 1; index < argc; index++ )
 	{
 		std::string jsonText = LoadFile( argv[index] );
 
-		Morrin::JSON::JsonKeyType firstKeyName;
+		std::string firstKeyName;
 		// 簡易パーサーでストレートな変換を試す(テストコードなのでこのまま展開出来ていればよい)
-		std::wcout << L"Direct Parse of JSON:" << std::endl;
+		Trace( std::format( L"Parsing JSON file: {}\n", argv[index] ) );
 		auto result = Morrin::JSON::ParseJSON( jsonText, [&firstKeyName]( const Morrin::JSON::NotificationType& type, const std::string_view& value ) -> bool
 		{
 			std::wstring typeText;
@@ -94,8 +99,7 @@ int wmain( int argc, wchar_t* argv[] )
 				firstKeyName = Morrin::JSON::UnEscapeToString( value );
 #endif
 			}
-			std::wcout << msg;
-			OutputDebugString( msg.c_str() );
+			Trace( msg );
 			// ここをトレースするだけでよい
 			return true; // trueを返すと、さらに子要素のパースを続ける
 		} );
@@ -107,7 +111,12 @@ int wmain( int argc, wchar_t* argv[] )
 		// こっちは純粋にデバッグ実行程度しかしないユニットテストにしてないのでまぁ面倒ごとはいらないでしょうｗ
 		auto obj = Morrin::JSON::ParseJSON( jsonText );
 		_ASSERTE( obj.has_value() );
-		switch( jsonText[0] )
+		int firstCharPos = 0;
+		if ( static_cast<BYTE>(jsonText[0]) == 0xEF && static_cast<BYTE>(jsonText[1]) == 0xBB && static_cast<BYTE>(jsonText[2]) == 0xBF )
+		{
+			firstCharPos = 3;
+		}
+		switch( jsonText[firstCharPos] )
 		{
 		case '{':	_ASSERTE( obj.type() == typeid(Morrin::JSON::JsonObject) );	break;
 		case '[':	_ASSERTE( obj.type() == typeid(Morrin::JSON::JsonArray) );	break;
@@ -116,11 +125,24 @@ int wmain( int argc, wchar_t* argv[] )
 		bool getVersion = false;
 		if ( firstKeyName == "LaunchPackage" )
 		{
+			auto arr = Morrin::JSON::GetValue( obj, "LaunchList" );
+			_ASSERTE( arr.has_value() && arr.type() == typeid(Morrin::JSON::JsonArray) );
+			auto arrObj = std::any_cast<Morrin::JSON::JsonArray>(arr);
+
+			// MsiPackageを探す
+			for ( int index = 0; index < arrObj.size(); ++index )
+			{
+				_ASSERTE( arrObj[index].has_value() && arrObj[index].type() == typeid(Morrin::JSON::JsonObject) );
+				auto jsonObj = std::any_cast<Morrin::JSON::JsonObject>( arrObj[index] );
+				if ( jsonObj.find( "MsiPackage" ) != jsonObj.end() )
+				{
+					firstKeyName = std::format( "LaunchList/{}/MsiPackage/Version", index );
+					break;
+				}
+			}
 			getVersion = true;
-			firstKeyName = "LaunchList/3/MsiPackage/Version";
-			auto launchList = Morrin::JSON::GetValue( obj, "LaunchList" );
-			_ASSERTE( launchList.has_value() && launchList.type() == typeid(Morrin::JSON::JsonArray) );
 		}
+		Trace( std::format( L"GetValue(`{}`)\n", Morrin::JSON::UnEscapeToWstring( firstKeyName ) ) );
 		auto searchObj = Morrin::JSON::GetValue( obj, firstKeyName );
 		if ( getVersion )
 		{
@@ -131,8 +153,7 @@ int wmain( int argc, wchar_t* argv[] )
 			auto version = std::any_cast<Morrin::JSON::JsonString>(searchObj);
 #endif
 			_ASSERTE( version.empty() == false );
-			std::wcout << std::format( L"Version: `{}`\n", version );
-
+			Trace( std::format( L"Version: `{}`\n", version ) );
 		}
 		else
 		{
