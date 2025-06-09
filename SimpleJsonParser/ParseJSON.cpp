@@ -96,6 +96,8 @@ private:
 	bool ParseString();
 	bool ParseNumber();
 
+	std::string_view ParseStringValue();
+
 	void SkipWhiteSpace()
 	{
 		while( m_offset < m_jsonText.length() && IsWhiteSpace( m_jsonText[m_offset] ) )
@@ -115,7 +117,6 @@ private:
 		}
 		return m_jsonText[m_offset];
 	}
-	std::string_view ParseStringValue();
 
 	bool IsWhiteSpace( std::string_view::value_type value ) const
 	{
@@ -458,6 +459,11 @@ bool JsonParser::Parse()
 	{
 		return false;
 	}
+	// BOM を飛ばす
+	if ( m_jsonText.length() >= 3 && static_cast<BYTE>(m_jsonText[0]) == 0xEF && static_cast<BYTE>(m_jsonText[1]) == 0xBB && static_cast<BYTE>(m_jsonText[2]) == 0xBF )
+	{
+		m_offset += 3;
+	}
 	while( m_offset < m_jsonText.length() )
 	{
 		if( !ParseElement() )
@@ -668,7 +674,7 @@ bool JsonParser::ParseNumber()
 }
 std::string_view JsonParser::ParseStringValue()
 {
-	_ASSERTE( GetChar() );
+	_ASSERTE( m_offset < m_jsonText.length() && GetChar() == '"' );
 	++m_offset;
 	auto start = m_offset;	// 開始位置を記録
 
