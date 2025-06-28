@@ -33,12 +33,12 @@ namespace Morrin::JSON
 struct LiteralValueDetail
 {
 	NotificationType type;
-	std::string_view text;
+	JsonRefKeyType text;
 };
 struct EscapeCharDetail
 {
-	std::string_view::value_type escapeChar;
-	std::string_view::value_type escapedChar;	// 実際の文字
+	JsonRefKeyType::value_type escapeChar;
+	JsonRefKeyType::value_type escapedChar;	// 実際の文字
 };
 //---------------
 //	static
@@ -81,7 +81,7 @@ inline std::string SPRINTF( _In_z_ _Printf_format_string_ const char* _fmt, ... 
 class JsonParser
 {
 public:
-	JsonParser( const std::string_view& jsonText, const ParseCallBack& callback )
+	JsonParser( const JsonRefKeyType& jsonText, const ParseCallBack& callback )
 		: m_jsonText( jsonText )
 		, m_offset( 0 )
 		, m_callback( callback )
@@ -96,7 +96,7 @@ private:
 	bool ParseString();
 	bool ParseNumber();
 
-	std::string_view ParseStringValue();
+	JsonRefKeyType ParseStringValue();
 
 	void SkipWhiteSpace()
 	{
@@ -105,7 +105,7 @@ private:
 			++m_offset;
 		}
 	}
-	std::string_view::value_type GetChar() const
+	JsonRefKeyType::value_type GetChar() const
 	{
 		if( m_offset >= m_jsonText.length() )
 		{
@@ -118,7 +118,7 @@ private:
 		return m_jsonText[m_offset];
 	}
 
-	bool IsWhiteSpace( std::string_view::value_type value ) const
+	bool IsWhiteSpace( JsonRefKeyType::value_type value ) const
 	{
 		// ホワイトスペースとして規定されている。isspace とはちょっと違うので定義を厳格化
 		switch( value )
@@ -132,8 +132,8 @@ private:
 		return false;
 	}
 private:
-	const std::string_view& m_jsonText;	// JSON テキスト
-	std::string_view::size_type m_offset;	// 現在のオフセット
+	const JsonRefKeyType& m_jsonText;	// JSON テキスト
+	JsonRefKeyType::size_type m_offset;	// 現在のオフセット
 	const ParseCallBack& m_callback;	// コールバック関数
 };
 //---------------
@@ -172,12 +172,12 @@ inline void PushValueT( std::stack<std::any*>& stack, const JsonKeyType& keyName
 
 ///////////////////////////////////////////////////////////////////////////////
 //	export Functions
-bool __stdcall ParseJSON( const std::string_view& jsonText, const ParseCallBack& proc )
+bool __stdcall ParseJSON( const JsonRefKeyType& jsonText, const ParseCallBack& proc )
 {
 	JsonParser parser( jsonText, proc );
 	return parser.Parse();
 }
-std::any __stdcall ParseJSON( const std::string_view& jsonText, const concurrency::cancellation_token& token/* = concurrency::cancellation_token::none()*/ )
+std::any __stdcall ParseJSON( const JsonRefKeyType& jsonText, const concurrency::cancellation_token& token/* = concurrency::cancellation_token::none()*/ )
 {
 	// 構造化したデータとして保持する
 	std::stack<std::any*> stack;	//	参照(ポインタ)を持たせることでコピーを防ぐ
@@ -187,7 +187,7 @@ std::any __stdcall ParseJSON( const std::string_view& jsonText, const concurrenc
 	std::any topObj = std::make_any<JsonObject>( rootObj );	// ルートオブジェクトを格納するための仮想親オブジェクト
 	stack.push( &topObj );
 
-	auto result = ParseJSON( jsonText, [&]( const Morrin::JSON::NotificationType& type, const std::string_view& value ) -> bool
+	auto result = ParseJSON( jsonText, [&]( const Morrin::JSON::NotificationType& type, const JsonRefKeyType& value ) -> bool
 	{
 		if( token.is_canceled() )
 		{
@@ -221,9 +221,9 @@ std::any __stdcall ParseJSON( const std::string_view& jsonText, const concurrenc
 		default:
 			// 想定外は例外を飛ばす
 #if _HAS_CXX20
-			throw new std::runtime_error( std::format( "Unknown NotificationType: {}", static_cast<int>(type) ) );
+			throw std::runtime_error( std::format( "Unknown NotificationType: {}", static_cast<int>(type) ) );
 #else
-			throw new std::runtime_error( SPRINTF( "Unknown NotificationType: %d", static_cast<int>(type) ) );
+			throw std::runtime_error( SPRINTF( "Unknown NotificationType: %d", static_cast<int>(type) ) );
 #endif
 		}
 		return true; // trueを返すと、さらに子要素のパースを続ける	)
@@ -301,11 +301,11 @@ std::any __stdcall GetValue( std::any obj, const JsonRefKeyType& searchKey )
 	return obj;
 }
 template <class ResultStringType> ResultStringType UnEscape(
-	const std::string_view& value,
-	std::function<void(const std::string_view& value, std::string_view::size_type pos, std::string_view::size_type prevPos, ResultStringType& resultStr)>&& SetPrevStr,
+	const JsonRefKeyType& value,
+	std::function<void(const JsonRefKeyType& value, JsonRefKeyType::size_type pos, JsonRefKeyType::size_type prevPos, ResultStringType& resultStr)>&& SetPrevStr,
 	std::function<ResultStringType(const std::wstring& u16str )>&& ConvertToResultStr )
 {
-	std::string_view::size_type pos = 0;
+	JsonRefKeyType::size_type pos = 0;
 	ResultStringType resultStr;
 	auto prevPos = pos;
 	std::wstring u16str;
@@ -315,7 +315,7 @@ template <class ResultStringType> ResultStringType UnEscape(
 		if( value[pos] == '\\' )
 		{
 			SetPrevStr( value, pos, prevPos, resultStr );
-			prevPos = std::string_view::npos;	//	エスケープ文字をセットしたので、以前の位置をクリアー
+			prevPos = JsonRefKeyType::npos;	//	エスケープ文字をセットしたので、以前の位置をクリアー
 			++pos;
 			if( value[pos] == 'u' )
 			{
@@ -361,7 +361,7 @@ template <class ResultStringType> ResultStringType UnEscape(
 				resultStr += ConvertToResultStr( u16str );
 				u16str.clear();
 			}
-			if( prevPos == std::string_view::npos )
+			if( prevPos == JsonRefKeyType::npos )
 			{
 				prevPos = pos;
 			}
@@ -377,12 +377,12 @@ template <class ResultStringType> ResultStringType UnEscape(
 	return resultStr;
 }
 // テキストのアンエスケープ(速度重視のため、共通化しない)
-std::string __stdcall UnEscapeToString( const std::string_view& value )
+std::string __stdcall UnEscapeToString( const JsonRefKeyType& value )
 {
 	return UnEscape<std::string>( value,
 		[]( const auto& value, auto pos, auto prevPos, auto& resultStr )
 		{
-			if( prevPos != std::string_view::npos )
+			if( prevPos != JsonRefKeyType::npos )
 			{
 				auto parseStr = value.substr( prevPos, pos-prevPos );
 				resultStr += parseStr;
@@ -391,12 +391,12 @@ std::string __stdcall UnEscapeToString( const std::string_view& value )
 		[]( const auto& u16str ){ return ToUtf8( u16str ); }
 	);
 }
-std::wstring __stdcall UnEscapeToWstring( const std::string_view& value )
+std::wstring __stdcall UnEscapeToWstring( const JsonRefKeyType& value )
 {
 	return UnEscape<std::wstring>( value,
 		[]( const auto& value, auto pos, auto prevPos, auto& resultStr )
 		{
-			if( prevPos != std::string_view::npos )
+			if( prevPos != JsonRefKeyType::npos )
 			{
 				auto parseStr = value.substr( prevPos, pos-prevPos );
 				resultStr += ToWString( parseStr, CP_UTF8 );
@@ -405,7 +405,7 @@ std::wstring __stdcall UnEscapeToWstring( const std::string_view& value )
 		[]( const auto& u16str ){ return u16str; }
 	);
 }
-int __stdcall ConvertToInt( const std::string_view& value )
+int __stdcall ConvertToInt( const JsonRefKeyType& value )
 {
 	if( value.empty()|| value == "0"sv )
 	{
@@ -437,7 +437,7 @@ std::string __stdcall ToString( const std::wstring_view& str, UINT codePage )
 	WideCharToMultiByte( codePage, 0, str.data(), static_cast<int>(str.size()), result.data(), static_cast<int>(result.size()), nullptr, nullptr );
 	return result;
 }
-std::wstring __stdcall ToWString( const std::string_view& str, UINT codePage/*= CP_UTF8*/ )
+std::wstring __stdcall ToWString( const JsonRefKeyType& str, UINT codePage/*= CP_UTF8*/ )
 {
 	if( str.empty() )
 	{
@@ -523,9 +523,9 @@ bool JsonParser::ParseElement()
 		}
 		// ここにきたらパースエラー
 #if _HAS_CXX20
-		throw new std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected character '{}'", m_offset, GetChar() ) );
+		throw std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected character '{}'", m_offset, GetChar() ) );
 #else
-		throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected character '%c'", m_offset, GetChar() ) );
+		throw std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected character '%c'", m_offset, GetChar() ) );
 #endif
 	}
 	// 末尾に来てる…ここにくるんだっけ？
@@ -553,9 +553,9 @@ bool JsonParser::ParseValues( NotificationType start, NotificationType end, bool
 		if( m_offset >= m_jsonText.length() )
 		{
 #if _HAS_CXX20
-			throw new std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected end of data", m_offset ) );
+			throw std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected end of data", m_offset ) );
 #else
-			throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected end of data", m_offset ) );
+			throw std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected end of data", m_offset ) );
 #endif
 		}
 		// 終端文字が来たのでブロック終了(必ずここに来る…はず)
@@ -567,9 +567,9 @@ bool JsonParser::ParseValues( NotificationType start, NotificationType end, bool
 		if( GetChar() != ',' )
 		{
 #if _HAS_CXX20
-			throw new std::invalid_argument( std::format( "Parse error at m_offset {}: expected ',' but found '{}'", m_offset, GetChar() ) );
+			throw std::invalid_argument( std::format( "Parse error at m_offset {}: expected ',' but found '{}'", m_offset, GetChar() ) );
 #else
-			throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected ',' but found '%c'", m_offset, GetChar() ) );
+			throw std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected ',' but found '%c'", m_offset, GetChar() ) );
 #endif
 		}
 	}
@@ -596,9 +596,9 @@ bool JsonParser::ParseKeyValue()
 	if( m_offset >= m_jsonText.length() || GetChar() != ':' )
 	{
 #if _HAS_CXX20
-		throw new std::invalid_argument( std::format( "Parse error at m_offset {}: expected ':' but found '{}'", m_offset, GetChar() ) );
+		throw std::invalid_argument( std::format( "Parse error at m_offset {}: expected ':' but found '{}'", m_offset, GetChar() ) );
 #else
-		throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected ':' but found '%c'", m_offset, GetChar() ) );
+		throw std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected ':' but found '%c'", m_offset, GetChar() ) );
 #endif
 	}
 	++m_offset;
@@ -658,9 +658,9 @@ bool JsonParser::ParseNumber()
 		if( m_offset >= m_jsonText.length() || !isdigit( GetChar() ) )	// 数字がないといけない
 		{
 #if _HAS_CXX20
-			throw new std::invalid_argument( std::format( "Parse error at m_offset {}: expected digit after 'e' or 'E' but found '{}'", m_offset, GetChar() ) );
+			throw std::invalid_argument( std::format( "Parse error at m_offset {}: expected digit after 'e' or 'E' but found '{}'", m_offset, GetChar() ) );
 #else
-			throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected digit after 'e' or 'E' but found '%c'", m_offset, GetChar() ) );
+			throw std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected digit after 'e' or 'E' but found '%c'", m_offset, GetChar() ) );
 #endif
 		}
 		while( isdigit( GetChar() ) )	// 数字が続く限り進める
@@ -672,13 +672,13 @@ bool JsonParser::ParseNumber()
 	auto value = m_jsonText.substr( start, m_offset - start );
 	return m_callback( NotificationType::Number, value );	// コールバックに通知
 }
-std::string_view JsonParser::ParseStringValue()
+JsonRefKeyType JsonParser::ParseStringValue()
 {
 	_ASSERTE( m_offset < m_jsonText.length() && GetChar() == '"' );
 	++m_offset;
 	auto start = m_offset;	// 開始位置を記録
 
-	std::string_view::value_type currChar = '\0';
+	JsonRefKeyType::value_type currChar = '\0';
 	while( m_offset < m_jsonText.length() && (currChar=GetChar()) != '"' )
 	{
 		// エスケープ文字が出てきた場合
@@ -703,9 +703,9 @@ std::string_view JsonParser::ParseStringValue()
 						{
 							// そもそも例外
 #if _HAS_CXX20
-							throw new std::invalid_argument( std::format( "Parse error at m_offset {}: expected hex digit after '\\u'", m_offset ) );
+							throw std::invalid_argument( std::format( "Parse error at m_offset {}: expected hex digit after '\\u'", m_offset ) );
 #else
-							throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected hex digit after '\\u'", m_offset ) );
+							throw std::invalid_argument( SPRINTF( "Parse error at m_offset %u: expected hex digit after '\\u'", m_offset ) );
 #endif
 						}
 					}
@@ -719,9 +719,9 @@ std::string_view JsonParser::ParseStringValue()
 			{
 				// エスケープ文字が定義されていない場合は例外
 #if _HAS_CXX20
-				throw new std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected escape character '{}'", m_offset, currChar ) );
+				throw std::invalid_argument( std::format( "Parse error at m_offset {}: unexpected escape character '{}'", m_offset, currChar ) );
 #else
-				throw new std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected escape character '%c'", m_offset, currChar ) );
+				throw std::invalid_argument( SPRINTF( "Parse error at m_offset %u: unexpected escape character '%c'", m_offset, currChar ) );
 #endif
 			}
 		}
