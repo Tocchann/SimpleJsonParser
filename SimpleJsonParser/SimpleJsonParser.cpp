@@ -157,7 +157,8 @@ int wmain( int argc, wchar_t* argv[] )
 		}
 		else
 		{
-			_ASSERTE( searchObj.has_value() && searchObj.type() == typeid(Morrin::JSON::JsonObject) );
+			_ASSERTE( searchObj.has_value() );
+			Trace( std::format( L"obj[{0}].type() == {1}", Morrin::JSON::ToWString( firstKeyName ), Morrin::JSON::ToWString( searchObj.type().name() ) ) );
 		}
 	}
 	return 0;
