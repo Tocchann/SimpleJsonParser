@@ -143,14 +143,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ParseJSON.cpp">
-      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">stdcpp17</LanguageStandard>
-    </ClCompile>
+    <ClCompile Include="JsonParser.cpp" />
     <ClCompile Include="SimpleJsonParser.cpp" />
+    <ClCompile Include="StringConverter.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ParseJSON.h" />
+    <ClInclude Include="JsonParser.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="StringConverter.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
